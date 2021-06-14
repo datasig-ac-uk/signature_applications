@@ -6,5 +6,5 @@ matplotlib==3.2.1
 moviepy==1.0.3
 requests==2.22.0
 tqdm==4.46.1
-git+git://github.com/kschlegel/PSFDataset.git@fc616da584aec841f2497bd03139318841d9ea73
-git+git://github.com/kschlegel/DatasetLoader.git@88587de554bf377874655e29aa1397d9ff348f49
+git+git://github.com/kschlegel/PSFDataset.git@adc0157752f74bca97e5716ace10e59a3a317ed9
+git+git://github.com/kschlegel/DatasetLoader.git@ef7a09553a4f3c71291a8588eff8b0b751d02ac5
