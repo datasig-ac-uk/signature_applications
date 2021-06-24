@@ -7,4 +7,4 @@ moviepy==1.0.3
 requests==2.22.0
 tqdm==4.46.1
 git+git://github.com/kschlegel/PSFDataset.git@0e14360a43c802878545d7022db9524dc9ad1c7c
-git+git://github.com/kschlegel/DatasetLoader.git@88587de554bf377874655e29aa1397d9ff348f49
+git+git://github.com/kschlegel/DatasetLoader.git@ef7a09553a4f3c71291a8588eff8b0b751d02ac5
