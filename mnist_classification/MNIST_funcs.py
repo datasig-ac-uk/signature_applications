@@ -456,7 +456,7 @@ def forest_scale_learn(scale_parameters, dim, depth, data, labels, CV=None, reg_
         best = np.argmax( np.delete( results , 1 , axis =1 ) , axis=0 )[1]
         return results, results[best]
 
-def inv_reset_sum(stream):
+def inv_reset_like_sum(stream):
     """
     The input stream is a numpy array. The returned output is a numpy array of
     the same shape, but where the n^th entry in the output is given by the
