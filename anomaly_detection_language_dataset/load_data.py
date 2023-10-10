@@ -31,16 +31,19 @@ corpus_df = pd.concat(wordlist_dfs).reset_index(drop=True)
 # obtain the training data for the language model (large sample of the english words)
 english_train_pickle_file = f"{data_folder}/english_train.pkl"
 if os.path.isfile(english_train_pickle_file):
+    print(f"loading in english_train from {english_train_pickle_file}")
     english_train = pd.read_pickle(english_train_pickle_file)
 else:
+    print(f"creating english_train dataframe with seed {seed}")
     # set seed for sampling
     set_seed(seed)
     n_words = len(corpus_df[corpus_df["language"]=="en"])-10000
     
     # sample english words from the corpus
-    english_train = corpus_df[corpus_df["language"]=="en"].sample(n_words)
+    english_train = corpus_df[corpus_df["language"]=="en"].sample(n_words, random_state=seed)
     english_train = english_train.reset_index(drop=True)
     
+    print(f"saving english_train to {english_train_pickle_file}")
     # save data for later
     english_train.to_pickle(english_train_pickle_file)
     
@@ -53,8 +56,10 @@ corpus_df["language"].value_counts()
 # obtain the sample of words for the anomaly detection task (10000 english words, 10000 non-english words)
 corpus_sample_pickle_file = f"{data_folder}/corpus_sample.pkl"
 if os.path.isfile(corpus_sample_pickle_file):
+    print(f"loading in corpus_sample_df from {corpus_sample_pickle_file}")
     corpus_sample_df = pd.read_pickle(corpus_sample_pickle_file)
 else:
+    print(f"creating corpus_sample_df dataframe with seed {seed}")
     # set seed for sampling
     set_seed(seed)
     n_english = 10000
@@ -70,5 +75,6 @@ else:
     english_df = corpus_df[corpus_df["language"]=="en"]
     corpus_sample_df = pd.concat([non_english_df, english_df]).reset_index(drop=True)
 
+    print(f"saving corpus_sample_df to {corpus_sample_pickle_file}")
     # save data for later
     corpus_sample_df.to_pickle(corpus_sample_pickle_file)

@@ -1,4 +1,4 @@
-nlpsig>=0.2.1
+nlpsig==0.2.1
 signax==0.2.1
 jupyter
 ipywidgets==8.1.1
