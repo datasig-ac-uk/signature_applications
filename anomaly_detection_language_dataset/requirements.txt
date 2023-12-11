@@ -1,4 +1,5 @@
-nlpsig==0.2.1
+signature_mahalanobis_knn==0.1.0
+nlpsig==0.2.2
 signax==0.2.1
 jupyter
 ipywidgets==8.1.1
