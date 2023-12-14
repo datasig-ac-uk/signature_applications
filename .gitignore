@@ -129,3 +129,8 @@ dmypy.json
 .pyre/
 
 .DS_Store
+
+# miscellaneous
+anomaly_detection_language_dataset/english-char-roberta/
+anomaly_detection_language_dataset/char-roberta/
+anomaly_detection_language_dataset/*.pkl
