@@ -6,8 +6,14 @@ Note that the data is pre-processed in [language_dataset_anomalies_data.ipynb](l
 
 ## How to Run
 
-A typical process for installing the package dependencies involves creating a new Python virtual environment and then inside the environment executing
+A typical process for installing the package dependencies involves creating a new Python virtual environment and then inside the environment executing:
 
 ```
 pip install -r requirements.txt
+```
+
+This notebook was developed with Python=3.10.13. With running the notebook in Jupyter, you may need to run the following to install an IPython kernel:
+
+```
+python -m ipykernel install --user --name=lang-analysis-env
 ```
