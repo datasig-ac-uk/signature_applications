@@ -1,6 +1,5 @@
 import numpy as np
-import esig
-from esig import tosig as ts
+import roughpy as rp
 import statistics
 from sklearn.metrics import accuracy_score
 from sklearn import linear_model
@@ -13,70 +12,122 @@ from sklearn.metrics import confusion_matrix
 import joblib
 from joblib import Parallel, delayed 
 
-def stream_normalise_mean_and_range(stream):
+def stream_normalise_mean_and_range(stream: np.ndarray) -> np.ndarray:
     """
-    stream is a numpy array of any shape.
+    Normalise the input stream to have mean 0 and be in [-1,1] in each channel.
 
-    The returned output is a copy of stream, retaining the same shape, but scaled
-    to have mean 0 and coordinates/channels in [-1,1]
+    Parameters
+    ----------
+    stream : np.ndarray
+        A two-dimensional numpy array of shape [length x dimension]
+
+    Returns
+    -------
+    np.ndarray
+        A copy of the input stream, retaining the same shape, but scaled 
+        to have mean 0 and coordinates/channels in [-1,1]
     """
+    # compute the range of each channel
+    range = stream.ptp(axis=0)
+    # replace 0s with 1s to avoid division by 0
+    range[range == 0] = 1
+    # scale the stream
+    return (stream - stream.mean(axis=0))/range
 
-    Q = stream.ptp(axis=0).shape
-    E = np.empty(Q,dtype=float)
-    for k in range(len(stream.ptp(axis=0))):
-        if stream.ptp(axis=0)[k] == 0:
-            E[k] = 1
-        else:
-            E[k] = stream.ptp(axis=0)[k]
-    Y = (stream - stream.mean(axis=0))/E
-    return Y
-
-def stream_normalise_mean_and_std(stream):
+def stream_normalise_mean_and_std(stream: np.ndarray) -> np.ndarray:
     """
-    stream can be a numpy array of any shape.
+    Normalise the input stream to have mean 0 and standard deviation 1 in each channel.
 
-    The returned output is a copy of stream, retaining the same shape, but scaled
-    to have mean 0 and standard deviation 1.0
+    Parameters
+    ----------
+    stream : np.ndarray
+        A two-dimensional numpy array of shape [length x dimension]
+
+    Returns
+    -------
+    np.ndarray
+        A copy of the input stream, retaining the same shape, but scaled 
+        to have mean 0 and standard deviation 1.0
     """
+    # compute the standard deviation of each channel
+    std = stream.std(axis=0)
+    # replace 0s with 1s to avoid division by 0
+    std[std == 0] = 1
+    # scale the stream
+    return (stream - stream.mean(axis=0))/std
 
-    Q = stream.std(axis=0).shape
-    E = np.empty(Q,dtype=float)
-    for k in range(len(stream.std(axis=0))):
-        if stream.std(axis=0)[k] == 0:
-            E[k] = 1
-        else:
-            E[k] = stream.std(axis=0)[k]
-    Y = (stream - stream.mean(axis=0))/E
-    return Y
-
-def sig_scale_depth_ratio(sig, dim, depth, scalefactor):
+def compute_signature(stream: np.ndarray, depth: int) -> np.ndarray:
     """
-    sig is a numpy array corresponding to the signature of a stream, computed by
-    esig, of dimension dim and truncated to level depth. The input scalefactor
-    can be any float.
+    Given a stream of data, compute the signature of the stream truncated
+    to the given depth using RoughPy.
 
-    The returned output is a numpy array of the same shape as sig. Each entry in
-    the returned array is the corresponding entry in sig multiplied by r^k,
-    where k is the level of sig to which the entry belongs. If the input depth
-    is 0, an error message is returned since the scaling will always leave the
-    level zero entry of a signature as 1.
+    Parameters
+    ----------
+    stream : np.ndarray
+        A two-dimensional numpy array of shape [length x dimension]
+    depth : int
+        The depth to which the signature should be truncated
+
+    Returns
+    -------
+    np.ndarray
+        A one-dimensional numpy array of length 1+dim+dim^2+...+dim^depth
+        containing the signature of the stream truncated to the given depth
     """
+    context = rp.get_context(width=stream.shape[1], depth=depth, coeffs=rp.DPReal)
+    increments = np.diff(stream, axis=0)
+    lie_incremement_stream = rp.LieIncrementStream.from_increments(increments, ctx=context)
+    return np.array(lie_incremement_stream.signature())
 
+def sig_scale_depth_ratio(
+    sig: np.ndarray,
+    dim: int,
+    depth: int,
+    scalefactor: float,
+) -> np.ndarray:
+    """
+    The returned output is a numpy array of the same shape as the input signature, sig.
+    Each entry in the returned array is the corresponding entry in sig multiplied by r^k,
+    where k is the level of sig to which the entry belongs.
+    
+    If the input depth is 0, an error message is returned since the scaling will always
+    leave the level zero entry of a signature as 1.
+
+    Parameters
+    ----------
+    sig : np.ndarray
+        A one-dimensional numpy array of length 1+dim+dim^2+...+dim^depth corresponding
+        to the signature of a stream of dimension dim and truncated to level depth.
+    dim : int
+        Dimension of the input stream
+    depth : int
+        Level to which the input signature is truncated
+    scalefactor : float
+        The scaling factor to be applied to the signature terms
+
+    Returns
+    -------
+    np.ndarray
+        A one-dimensional numpy array of length 1+dim+dim^2+...+dim^depth.
+        Each entry is the corresponding entry in sig multiplied by r^k, where k
+        is the level of sig to which the entry belongs.
+    """
+    sig_terms_per_depth = [dim ** d for d in range(depth + 1)]
     if depth == 0:
-        return print("Error: Depth 0 term of a signature is always 1 and will not be changed by scaling")
+        raise ValueError(
+            "Depth 0 term of a signature is always 1 and will not be changed by scaling"
+        )
+    elif sig.shape != (sum(sig_terms_per_depth),):
+        raise ValueError(
+            f"sig is not the correct shape for a signature of dimension {dim} and depth {depth}."
+            f"Expected shape: 1+dim+dim^2+...+dim^depth = {sum(sig_terms_per_depth)},"
+            f"but got shape: {sig.shape}."
+        )
     else:
-        e = []
-        e.append(sig[0])
-        for j in range(1, dim + 1):
-            e.append( scalefactor*sig[j] )
-        if depth >= 2:
-            for k in range( dim + 1 , ts.sigdim( dim , 2) ):
-                e.append( (scalefactor**2)*sig[k] )
-            for i in range(2, depth):
-                for a in range( ts.sigdim( dim , i ) , ts.sigdim( dim , i+1 ) ):
-                    e.append( (scalefactor**(i+1))*sig[a] )
-        E = np.array(e)
-        return E
+        for d in range(depth + 1):
+            sig[sum(sig_terms_per_depth[:d]) : sum(sig_terms_per_depth[:d + 1])] *= scalefactor ** d
+        
+        return sig
 
 def mnist_train_data(data_directory, cpu_number):
     """
