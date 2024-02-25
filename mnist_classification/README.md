@@ -19,4 +19,4 @@ python -m ipykernel install --user --name=mnist-roughpy-env
 
 ## Note
 
-Previously, the notebook was written to run with Python=3.7 and used [esig](https://esig.readthedocs.io/en/latest/index.html) for signature computation. The notebook has been updated to run with Python=3.11 and uses [RoughPy](https://roughpy.org/) (version 0.1.1).
+Previously, the notebook was written to run with Python=3.7 and used [esig](https://esig.readthedocs.io/en/latest/index.html) for signature computation. The notebook has been updated to run with Python=3.11.7 and uses [RoughPy](https://roughpy.org/) (version 0.1.1).
