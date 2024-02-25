@@ -14,7 +14,7 @@ pip install -r requirements.txt
 This notebook has been updated to run with Python=3.11. With running the notebook in Jupyter, you may need to run the following to install an IPython kernel:
 
 ```{bash}
-python -m ipykernel install --user --name=lang-analysis-env
+python -m ipykernel install --user --name=mnist-roughpy-env
 ```
 
 ## Note
