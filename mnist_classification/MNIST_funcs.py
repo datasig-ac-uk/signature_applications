@@ -1,12 +1,13 @@
 import statistics
+from typing import Any
 
 import joblib
 import numpy as np
 import roughpy as rp
 from joblib import Parallel, delayed
-from sklearn import linear_model
 from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestClassifier as RFC
+from sklearn.linear_model import LogisticRegressionCV, RidgeClassifierCV
 from sklearn.metrics import accuracy_score, confusion_matrix, silhouette_score
 from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVC
@@ -95,7 +96,7 @@ def sig_scale_depth_ratio(
     sig: np.array,
     dim: int,
     depth: int,
-    scalefactor: float,
+    scale_factor: float,
 ) -> np.array:
     """
     The returned output is a numpy array of the same shape as the input signature, sig.
@@ -114,7 +115,7 @@ def sig_scale_depth_ratio(
         Dimension of the input stream
     depth : int
         Level to which the input signature is truncated
-    scalefactor : float
+    scale_factor : float
         The scaling factor to be applied to the signature terms
 
     Returns
@@ -140,7 +141,7 @@ def sig_scale_depth_ratio(
         # scale the signature terms at each depth
         for d in range(depth + 1):
             sig[sum(sig_terms_per_depth[:d]) : sum(sig_terms_per_depth[: d + 1])] *= (
-                scalefactor**d
+                scale_factor**d
             )
 
         return sig
@@ -279,28 +280,21 @@ def mnist_test_data(
 
 
 def ridge_learn(
-    scale_param,
-    dim,
-    depth,
-    data,
-    labels,
-    CV=None,
-    reg=[np.array((0.1, 1, 10))],
-    cpu_number=1,
-):
+    scale_factor: float,
+    dim: int,
+    depth: int,
+    data: list[np.array],
+    labels: list[int],
+    CV: Any = None,
+    reg: list[np.array] = [np.array((0.1, 1, 10))],
+    cpu_number: int = 1,
+) -> tuple[float, RidgeClassifierCV, float]:
     """
-    scale_param is a float, dim and depth are positive integers, data is a list
-    of numpy arrays with each array having the shape of an esig stream2sig
-    output for a stream of dimension dim truncated to level depth, labels is a
-    list, same length as data list, of integers, CV determines the
-    cross-validation splitting strategy of a sklearn GridSearchCV and can be any
-    of the allowed options for this (deault is None), reg is a numpy array of
-    floats (its default is numpy.array((0.1,1.0,10.0))), and cpu_number is an
-    integer (its default value is 1).
+    Fit a RidgeClassifierCV model to the input data, using the given scale factor.
 
     The entries in the data list are scaled via the sig_scale_depth_ratio
     function, i.e. via sig_scale_depth_ratio(data, dim, depth,
-    scalefactor=scale_param), and cpu_number number of cpus are used for
+    scale_factor=scale_factor), and cpu_number number of cpus are used for
     parallelisation.
 
     Once scaled, a sklearn GridSearchCV is run with the model set to be
@@ -311,11 +305,38 @@ def ridge_learn(
     scaled data, and the accuracy_score of the predicted labels compared to the
     actual labels is computed.
 
-    The returned output is a list composed of the scale_param used, the model
+    The returned output is a list composed of the scale_factor used, the model
     selected during the GridSearch, and the accuracy_score achieved by the
     selected model.
-    """
 
+    Parameters
+    ----------
+    scale_factor : float
+        The scaling factor to be applied to the signature terms
+    dim : int
+        Dimension of the input stream
+    depth : int
+        Level to which the input signature is truncated
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+        containing the signature of the stream
+    labels : list[int]
+        List of integer labels marking the number corresponding to each sequence
+    CV : Any, optional
+        Must be an int, cross-validation generator or an iterable.
+        See scikit-learn documentation for more details, by default None
+    reg : list[np.array], optional
+        List of possible alpha inputs for a RidgeClassifierCV model,
+        by default [np.array((0.1, 1, 10))]
+    cpu_number : int, optional
+        The number of cpus to use for parallelisation, by default 1
+
+    Returns
+    -------
+    tuple[float, RidgeClassifierCV, float]
+        A tuple containing the scale_factor used, the model selected during the
+        GridSearch, and the accuracy_score achieved by the selected model
+    """
     if depth == 0:
         return print(
             "Error: Depth 0 term of signature is always 1 and will not change under scaling"
@@ -323,11 +344,11 @@ def ridge_learn(
     if dim == 1:
         return print("Error: One-dimensionl signatures are trivial")
     else:
-        ridge = linear_model.RidgeClassifierCV()
+        ridge = RidgeClassifierCV()
         tuned_params = {"alphas": reg}
         Q = Parallel(n_jobs=cpu_number)(
             [
-                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_param)
+                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_factor)
                 for k in range(len(data))
             ]
         )
@@ -338,39 +359,68 @@ def ridge_learn(
         best_model = model.best_estimator_
         preds = best_model.predict(Q)
         acc = accuracy_score(preds, labels)
-        return scale_param, best_model, acc
+        return scale_factor, best_model, acc
 
 
 def ridge_scale_learn(
-    scale_parameters,
-    dim,
-    depth,
-    data,
-    labels,
-    CV=None,
-    reg=[np.array((0.1, 1, 10))],
-    cpu_number_one=1,
-    cpu_number_two=1,
-):
+    scale_factors: list[float],
+    dim: int,
+    depth: int,
+    data: list[np.array],
+    labels: list[int],
+    CV: Any = None,
+    reg: list[np.array] = [np.array((0.1, 1, 10))],
+    cpu_number_one: int = 1,
+    cpu_number_two: int = 1,
+) -> tuple[
+    list[tuple[float, RidgeClassifierCV, float]],
+    tuple[float, RidgeClassifierCV, float],
+]:
     """
-    scale_parameters is a list of floats, dim and depth are positive integers,
-    data is a list of numpy arrays with each array having the shape of an esig
-    stream2sig output for a stream of dimension dim truncated to level depth,
-    labels is a list, same length as data list, of integers, CV determines the
-    cross-validation splitting strategy of a sklearn GridSearchCV and can be any
-    of the allowed options for this (deault is None), reg is a numpy array of
-    floats (its default is numpy.array((0.1,1.0,10.0))), and cpu_number_one and
-    cpu_number_two are integers (default values are 1).
+    Fit a RidgeClassifierCV model to the input data, using the given scale factors.
 
     The returned outputs are a list of the results of ridge_learn(r, dim, depth,
-    data, labels, CV, reg) for each entry r in scale_parameters, and a separate
-    recording of the output corresponding to the entry r in scale_parameters for
-    which the best accuracy_score is achieved. The integer cpu_number_one
-    determines how many cpus are used for parallelisation over the scalefactors,
+    data, labels, CV, reg) for each entry r in scale_factors, and a separate
+    recording of the output corresponding to the entry r in scale_factors for
+    which the best accuracy_score is achieved The integer cpu_number_one
+    determines how many cpus are used for parallelisation over the scale_factors,
     whilst cpu_number_two determines the number of cpus used for parallelisation
-    during the call of the function ridge_learn for each scalefactor considered.
-    """
+    during the call of the function ridge_learn for each scale_factor considered.
 
+    Parameters
+    ----------
+    scale_factors : list[float]
+        List of scaling factors to be applied to the signature terms
+    dim : int
+        Dimension of the input stream
+    depth : int
+        Level to which the input signature is truncated
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+        containing the signature of the stream
+    labels : list[int]
+        List of integer labels marking the number corresponding to each sequence
+    CV : Any, optional
+        Must be an int, cross-validation generator or an iterable.
+        See scikit-learn documentation for more details, by default None
+    reg : list[np.array], optional
+        List of possible alpha inputs for a RidgeClassifierCV model,
+        by default [np.array((0.1, 1, 10))]
+    cpu_number_one : int, optional
+        The number of cpus to use for parallelisation over the scale_factors,
+        by default 1
+    cpu_number_two : int, optional
+        The number of cpus to use for parallelisation during the call of the
+        function ridge_learn for each scale_factor considered, by default 1
+
+    Returns
+    -------
+    tuple[list[tuple[float, RidgeClassifierCV, float]], tuple[float, RidgeClassifierCV, float]]
+        A tuple containing a list of the results of ridge_learn(r, dim, depth,
+        data, labels, CV, reg) for each entry r in scale_factors, and a separate
+        recording of the output corresponding to the entry r in scale_factors for
+        which the best accuracy_score is achieved
+    """
     if depth == 0:
         return print(
             "Error: Depth 0 term of signature is always 1 and will not change under scaling"
@@ -387,7 +437,7 @@ def ridge_scale_learn(
                 delayed(ridge_learn)(
                     r, dim, depth, data, labels, CV, reg, cpu_number=cpu_number_two
                 )
-                for r in scale_parameters
+                for r in scale_factors
             ]
         )
         best = np.argmax(np.delete(results, 1, axis=1), axis=0)[1]
@@ -395,46 +445,65 @@ def ridge_scale_learn(
 
 
 def SVC_learn(
-    scale_param,
-    dim,
-    depth,
-    data,
-    labels,
-    CV=None,
-    regC=[1.0],
-    reg_gamma=["scale"],
-    reg_kernel=["rbf"],
-    cpu_number=1,
-):
+    scale_factor: float,
+    dim: int,
+    depth: int,
+    data: list[np.array],
+    labels: list[int],
+    CV: Any = None,
+    regC: list[float] = [1.0],
+    reg_gamma: list[str | float] = ["scale"],
+    reg_kernel: list[str | callable] = ["rbf"],
+    cpu_number: int = 1,
+) -> tuple[float, SVC, float]:
     """
-    scale_param is a float, dim and depth are positive integers, data is a list
-    of numpy arrays with each array having the shape of an esig stream2sig
-    output for a stream of dimension dim truncated to level depth, labels is a
-    list, same length as data list, of integers, CV determines the
-    cross-validation splitting strategy of a sklearn GridSearchCV and can be any
-    of the allowed options for this (its deault is None), regC is a list of
-    possible C inputs for a SVC model (default is [1.0]), reg_gamma is a list of
-    possible gamma value strategies for a SVC model (default is ['scale']),
-    reg_kernel is a list of possible kernels to be used in a SVC model (default
-    is ['rbf']), and cpu_number is an integer controlling the number of cpus
-    used for parallelisation (its default value is 1)
+    Fit a SVC model to the input data, using the given scale factor.
 
     The entries in the data list are scaled via the sig_scale_depth_ratio
-    function with scale_param as the scalefactor, i.e.
-    sig_scale_depth_ratio(data, dim, depth, scalefactor = scale_param).
+    function with scale_factor as the scale_factor, i.e.
+    sig_scale_depth_ratio(data, dim, depth, scale_factor = scale_factor).
 
     Once scaled, a sklearn GridSearchCV is run with the model set to be
     SVC(random_state=42), the param_grid to be {'C':regC , 'gamma':reg_gamma ,
-    'kernel':reg_kernel} and the cross-validation strategy to be determined by
-    CV.
+    'kernel':reg_kernel} and the cross-validation strategy to be determined by CV.
 
     The selected best model is used to predict the labels for the appropriately
     scaled data, and the accuracy_score of the predicted labels compared to the
     actual labels is computed. The returned output is a list composed of the
-    scale_param used, the model selected during the GridSearch, and the
+    scale_factor used, the model selected during the GridSearch, and the
     accuracy_score achieved by the selected model.
-    """
 
+    Parameters
+    ----------
+    scale_factor : float
+        The scaling factor to be applied to the signature terms
+    dim : int
+        Dimension of the input stream
+    depth : int
+        Level to which the input signature is truncated
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+        containing the signature of the stream
+    labels : list[int]
+        List of integer labels marking the number corresponding to each sequence
+    CV : Any, optional
+        Must be an int, cross-validation generator or an iterable.
+        See scikit-learn documentation for more details, by default None
+    regC : list[float], optional
+        List of possible C inputs for a SVC model, by default [1.0]
+    reg_gamma : list[str  |  float], optional
+        List of possible gamma value strategies for a SVC model, by default ["scale"]
+    reg_kernel : list[str  |  callable], optional
+        List of possible kernels to be used in a SVC model, by default ["rbf"]
+    cpu_number : int, optional
+        The number of cpus to use for parallelisation, by default 1
+
+    Returns
+    -------
+    tuple[float, SVC, float]
+        A tuple containing the scale_factor used, the model selected during the
+        GridSearch, and the accuracy_score achieved by the selected model
+    """
     if depth == 0:
         return print(
             "Error: Depth 0 term of signature is always 1 and will not change under scaling"
@@ -446,7 +515,7 @@ def SVC_learn(
         tuned_params = {"kernel": reg_kernel, "C": regC, "gamma": reg_gamma}
         Q = Parallel(n_jobs=cpu_number)(
             [
-                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_param)
+                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_factor)
                 for k in range(len(data))
             ]
         )
@@ -457,48 +526,72 @@ def SVC_learn(
         best_model = model.best_estimator_
         preds = best_model.predict(Q)
         acc = accuracy_score(preds, labels)
-        return scale_param, best_model, acc
+        return scale_factor, best_model, acc
 
 
 def SVC_scale_learn(
-    scale_parameters,
-    dim,
-    depth,
-    data,
-    labels,
-    CV=None,
-    regC=[1.0],
-    reg_gamma=["scale"],
-    reg_kernel=["rbf"],
-    cpu_number_one=1,
-    cpu_number_two=1,
-):
+    scale_factors: list[float],
+    dim: int,
+    depth: int,
+    data: list[np.array],
+    labels: list[int],
+    CV: Any = None,
+    regC: list[float] = [1.0],
+    reg_gamma: list[str | float] = ["scale"],
+    reg_kernel: list[str | callable] = ["rbf"],
+    cpu_number_one: int = 1,
+    cpu_number_two: int = 1,
+) -> tuple[list[tuple[float, SVC, float]], tuple[float, SVC, float]]:
     """
-    scale_parameters is a list of floats, dim and depth are positive integers
-    data is a list of numpy arrays with each array having the shape of an esig
-    stream2sig output for a stream of dimension dim truncated to level depth,
-    labels is a list, same length as data list, of integers, CV determines the
-    cross-validation splitting strategy of a sklearn GridSearchCV and can be any
-    of the allowed options for this (its deault is None), regC is a list of
-    possible C inputs for a SVC model (default is [1.0]), reg_gamma is a list of
-    possible gamma value strategies for a SVC model (default is ['scale']),
-    reg_kernel is a list of possible kernels to be used in a SVC model (default
-    is ['rbf']), and    cpu_number_one and cpu_number_two are integers
-    controlling the number of cpus used for parallelisation (default values are
-    1).
+    Fit a SVC model to the input data, using the given scale factors.
 
     The returned outputs are a list of the results of SVC_learn(r, dim, depth,
     data, labels, CV, regC, reg_gamma, reg_kernel) for each entry r in
-    scale_parameters, and a separate recording of the output corresponding to
-    the entry r in scale_parameters for which the best accuracy_score is
-    achieved.
+    scale_factors, and a separate recording of the output corresponding to
+    the entry r in scale_factors for which the best accuracy_score is achieved.
 
     The integer cpu_number_one determines how many cpus are used for
-    parallelisation over the scalefactors, whilst cpu_number_two determines the
+    parallelisation over the scale_factors, whilst cpu_number_two determines the
     number of cpus used for parallelisation during the call of the function
-    SVC_learn for each scalefactor considered.
-    """
+    SVC_learn for each scale_factor considered.
 
+    Parameters
+    ----------
+    scale_factors : list[float]
+        List of scaling factors to be applied to the signature terms
+    dim : int
+        Dimension of the input stream
+    depth : int
+        Level to which the input signature is truncated
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+        containing the signature of the stream
+    labels : list[int]
+        List of integer labels marking the number corresponding to each sequence
+    CV : Any, optional
+        Must be an int, cross-validation generator or an iterable.
+        See scikit-learn documentation for more details, by default None
+    regC : list[float], optional
+        List of possible C inputs for a SVC model, by default [1.0]
+    reg_gamma : list[str  |  float], optional
+        List of possible gamma value strategies for a SVC model, by default ["scale"]
+    reg_kernel : list[str  |  callable], optional
+        List of possible kernels to be used in a SVC model, by default ["rbf"]
+    cpu_number_one : int, optional
+        The number of cpus to use for parallelisation over the scale_factors,
+        by default 1
+    cpu_number_two : int, optional
+        The number of cpus to use for parallelisation during the call of the
+        function ridge_learn for each scale_factor considered, by default 1
+
+    Returns
+    -------
+    tuple[list[tuple[float, SVC, float]], tuple[float, SVC, float]]
+        A tuple containing a list of the results of SVC_learn(r, dim, depth,
+        data, labels, CV, regC, reg_gamma, reg_kernel) for each entry r in
+        scale_factors, and a separate recording of the output corresponding to
+        the entry r in scale_factors for which the best accuracy_score is achieved
+    """
     if depth == 0:
         return print(
             "Error: Depth 0 term of signature is always 1 and will not change under scaling"
@@ -524,7 +617,7 @@ def SVC_scale_learn(
                     reg_kernel,
                     cpu_number=cpu_number_two,
                 )
-                for r in scale_parameters
+                for r in scale_factors
             ]
         )
         best = np.argmax(np.delete(results, 1, axis=1), axis=0)[1]
@@ -532,46 +625,64 @@ def SVC_scale_learn(
 
 
 def logistic_learn(
-    scale_param,
-    dim,
-    depth,
-    data,
-    labels,
-    CV=None,
-    regC=[5],
-    no_iter=[100],
-    cpu_number=1,
-):
+    scale_factor: float,
+    dim: int,
+    depth: int,
+    data: list[np.array],
+    labels: list[int],
+    CV: Any = None,
+    regC: list[int] = [5],
+    no_iter: list[int] = [100],
+    cpu_number: int = 1,
+) -> tuple[float, LogisticRegressionCV, float]:
     """
-    scale_parameters is a float, dim and depth are positive integers, data is a
-    list of numpy arrays with each array having the shape of an esig stream2sig
-    output for a stream of dimension dim truncated to level depth, labels is a
-    list, same length as data list, of integers, CV determines the
-    cross-validation splitting strategy of a sklearn GridSearchCV and can be any
-    of the allowed options for this (deault is None), regC is a list of possible
-    Cs inputs for a LogisticRegressionCV model (default is [5]), no_iter is a
-    list of possible maximum number of iterations for a     LogisticRegressionCV
-    model (default is [100]) and  cpu_number is an integer controlling the
-    number of cpus used for parallelisation (its default value is 1).
+    Fit a LogisticRegressionCV model to the input data, using the given scale factor.
 
     The entries in the data list are scaled via the sig_scale_depth_ratio
-    function using scale_param as the scalefactor, i.e via
-    sig_scale_depth_ratio(data, dim, depth, scalefactor=scale_param).
+    function using scale_factor as the scale_factor, i.e via
+    sig_scale_depth_ratio(data, dim, depth, scale_factor=scale_factor).
 
     Once scaled, a sklearn GridSearchCV is run with the model set to be
     LogisticRegressionCV(random_state=42), the param_grid to be {'Cs':regC ,
-    'max_iter':no_iter} and the cross-validation strategy to be determined by
-    CV.
+    'max_iter':no_iter} and the cross-validation strategy to be determined by CV.
 
     The selected best model is used to predict the labels for the appropriately
     scaled data, and the accuracy_score of the predicted labels compared to the
     actual labels is computed.
 
-    The returned output is a list composed of the scale_param used, the model
+    The returned output is a list composed of the scale_factor used, the model
     selected during the GridSearch, and the accuracy_score achieved by the
     selected model.
-    """
 
+    Parameters
+    ----------
+    scale_factor : float
+        The scaling factor to be applied to the signature terms
+    dim : int
+        Dimension of the input stream
+    depth : int
+        Level to which the input signature is truncated
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+        containing the signature of the stream
+    labels : list[int]
+        List of integer labels marking the number corresponding to each sequence
+    CV : Any, optional
+        Must be an int, cross-validation generator or an iterable.
+        See scikit-learn documentation for more details, by default None
+    regC : list[int], optional
+        List of possible Cs inputs for a LogisticRegressionCV model, by default [5]
+    no_iter : list[int], optional
+        List of possible maximum number of iterations for a LogisticRegressionCV
+    cpu_number : int, optional
+        The number of cpus to use for parallelisation, by default 1
+
+    Returns
+    -------
+    tuple[float, LogisticRegressionCV, float]
+        A tuple containing the scale_factor used, the model selected during the
+        GridSearch, and the accuracy_score achieved by the selected model
+    """
     if depth == 0:
         return print(
             "Error: Depth 0 term of signature is always 1 and will not change under scaling"
@@ -579,11 +690,11 @@ def logistic_learn(
     if dim == 1:
         return print("Error: One-dimensionl signatures are trivial")
     else:
-        LR = linear_model.LogisticRegressionCV(random_state=42)
+        LR = LogisticRegressionCV(random_state=42)
         tuned_params = {"Cs": regC, "max_iter": no_iter}
         Q = Parallel(n_jobs=cpu_number)(
             [
-                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_param)
+                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_factor)
                 for k in range(len(data))
             ]
         )
@@ -594,46 +705,72 @@ def logistic_learn(
         best_model = model.best_estimator_
         preds = best_model.predict(Q)
         acc = accuracy_score(preds, labels)
-        return scale_param, best_model, acc
+        return scale_factor, best_model, acc
 
 
 def logistic_scale_learn(
-    scale_parameters,
-    dim,
-    depth,
-    data,
-    labels,
-    CV=None,
-    regC=[5],
-    no_iter=[100],
-    cpu_number_one=1,
-    cpu_number_two=1,
-):
+    scale_factors: list[float],
+    dim: int,
+    depth: int,
+    data: list[np.array],
+    labels: list[int],
+    CV: Any = None,
+    regC: list[int] = [5],
+    no_iter: list[int] = [100],
+    cpu_number_one: int = 1,
+    cpu_number_two: int = 1,
+) -> tuple[
+    list[tuple[float, LogisticRegressionCV, float]],
+    tuple[float, LogisticRegressionCV, float],
+]:
     """
-    scale_parameters is a list of floats, dim and depth are positive integers,
-    data is a list of numpy arrays with each array having the shape of an esig
-    stream2sig output for a stream of dimension dim truncated to level depth,
-    labels is a list, same length as data list, of integers, CV determines the
-    cross-validation splitting strategy of a sklearn GridSearchCV and can be any
-    of the allowed options for this (deault is None), regC is a list of possible
-    Cs inputs for a LogisticRegressionCV model (default is [5]), no_iter is a
-    list of possible maximum number of iterations for a LogisticRegressionCV
-    model (default is [100]), and cpu_number_one and cpu_number_two are integers
-    controlling the number of cpus used for parallelisation (default values are
-    1).
+    Fit a LogisticRegressionCV model to the input data, using the given scale factors.
 
     The returned outputs are a list of the results of logistic_learn(r, dim,
     depth, data, labels, CV, regC, no_iter) for each entry r in
-    scale_parameters, and a separate recording of the output corresponding to
-    the entry r in scale_parameters for which the best accuracy_score is
-    achieved.
+    scale_factors, and a separate recording of the output corresponding to
+    the entry r in scale_factors for which the best accuracy_score is achieved.
 
     The integer cpu_number_one determines how many cpus are used for
-    parallelisation over the scalefactors, whilst cpu_number_two determines the
+    parallelisation over the scale_factors, whilst cpu_number_two determines the
     number of cpus used for parallelisation during the call of the function
-    logistic_learn for each scalefactor considered.
-    """
+    logistic_learn for each scale_factor considered.
 
+    Parameters
+    ----------
+    scale_factors : list[float]
+        List of scaling factors to be applied to the signature terms
+    dim : int
+        Dimension of the input stream
+    depth : int
+        Level to which the input signature is truncated
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+        containing the signature of the stream
+    labels : list[int]
+        List of integer labels marking the number corresponding to each sequence
+    CV : Any, optional
+        Must be an int, cross-validation generator or an iterable.
+        See scikit-learn documentation for more details, by default None
+    regC : list[int], optional
+        List of possible Cs inputs for a LogisticRegressionCV model, by default [5]
+    no_iter : list[int], optional
+        List of possible maximum number of iterations for a LogisticRegressionCV
+    cpu_number_one : int, optional
+        The number of cpus to use for parallelisation over the scale_factors,
+        by default 1
+    cpu_number_two : int, optional
+        The number of cpus to use for parallelisation during the call of the
+        function ridge_learn for each scale_factor considered, by default 1
+
+    Returns
+    -------
+    tuple[list[tuple[float, LogisticRegressionCV, float]], tuple[float, LogisticRegressionCV, float]]
+        A tuple containing a list of the results of logistic_learn(r, dim, depth,
+        data, labels, CV, regC, no_iter) for each entry r in scale_factors, and a separate
+        recording of the output corresponding to the entry r in scale_factors for which
+        the best accuracy_score is achieved
+    """
     if depth == 0:
         return print(
             "Error: Depth 0 term of signature is always 1 and will not change under scaling"
@@ -658,7 +795,7 @@ def logistic_scale_learn(
                     no_iter,
                     cpu_number=cpu_number_two,
                 )
-                for r in scale_parameters
+                for r in scale_factors
             ]
         )
         best = np.argmax(np.delete(results, 1, axis=1), axis=0)[1]
@@ -666,35 +803,25 @@ def logistic_scale_learn(
 
 
 def forest_learn(
-    scale_param,
-    dim,
-    depth,
-    data,
-    labels,
-    CV=None,
-    reg_est=[10, 100],
-    reg_feat=["auto"],
-    cpu_number=1,
-):
+    scale_factor: float,
+    dim: int,
+    depth: int,
+    data: list[np.array],
+    labels: list[int],
+    CV: Any = None,
+    reg_est: list[int] = [10, 100],
+    reg_feat: list[str | int | float] = ["auto"],
+    cpu_number: int = 1,
+) -> tuple[float, RFC, float]:
     """
-    scale_param is a float, dim and depth are positive integers, data is a list
-    of numpy arrays with each array having the shape of an esig stream2sig
-    output for a stream of dimension dim truncated to level depth, labels is a
-    list, same length as data list, of integers, CV determines the
-    cross-validation splitting strategy of a sklearn GridSearchCV and can be any
-    of the allowed options for this (deault is None), reg_est is a list of
-    possible n_estimators inputs for a RandomForestClassifier model (default is
-    [10,100]), reg_feat is is a list of max_features strategies for a
-    RandomForestClassifier model (default is ['auto']), and cpu_number is an
-    integer controlling the number of cpus used for parallelisation (its default
-    value is 1).
+    Fit a RandomForestClassifier model to the input data, using the given scale factor.
 
     The entries in the data list are scaled via the sig_scale_depth_ratio
-    function with scale_param as the scalefactor, i.e
-    sig_scale_depth_ratio(data, dim, depth, scalefactor=scale_param).
+    function with scale_factor as the scale_factor, i.e
+    sig_scale_depth_ratio(data, dim, depth, scale_factor=scale_factor).
 
     Once scaled, a sklearn GridSearchCV is run with the model set to be
-    RFC(random_state=42), the param_grid to be {'max_features':reg_feat ,
+    RFC(random_state=42), the param_grid to be {'max_features':reg_feat,
     'n_estimators':reg_est} and the cross-validation strategy to be determined
     by CV.
 
@@ -702,11 +829,41 @@ def forest_learn(
     scaled data, and the accuracy_score of the predicted labels compared to the
     actual labels is computed.
 
-    The returned output is a list composed of the scale_param used, the model
+    The returned output is a list composed of the scale_factor used, the model
     selected during the GridSearch, and the accuracy_score achieved by the
     selected model.
-    """
 
+    Parameters
+    ----------
+    scale_factor : float
+        The scaling factor to be applied to the signature terms
+    dim : int
+        Dimension of the input stream
+    depth : int
+        Level to which the input signature is truncated
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+        containing the signature of the stream
+    labels : list[int]
+        List of integer labels marking the number corresponding to each sequence
+    CV : Any, optional
+        Must be an int, cross-validation generator or an iterable.
+        See scikit-learn documentation for more details, by default None
+    reg_est : list[int], optional
+        List of possible n_estimators inputs for a RandomForestClassifier model,
+        by default [10,100]
+    reg_feat : list[str  |  int  |  float], optional
+        List of max_features strategies for a RandomForestClassifier model,
+        by default ["auto"]
+    cpu_number : int, optional
+        The number of cpus to use for parallelisation, by default 1
+
+    Returns
+    -------
+    tuple[float, RFC, float]
+        A tuple containing the scale_factor used, the model selected during the
+        GridSearch, and the accuracy_score achieved by the selected model
+    """
     if depth == 0:
         return print(
             "Error: Depth 0 term of signature is always 1 and will not change under scaling"
@@ -718,7 +875,7 @@ def forest_learn(
         tuned_params = {"n_estimators": reg_est, "max_features": reg_feat}
         Q = Parallel(n_jobs=cpu_number)(
             [
-                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_param)
+                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_factor)
                 for k in range(len(data))
             ]
         )
@@ -729,46 +886,71 @@ def forest_learn(
         best_model = model.best_estimator_
         preds = best_model.predict(Q)
         acc = accuracy_score(preds, labels)
-        return scale_param, best_model, acc
+        return scale_factor, best_model, acc
 
 
 def forest_scale_learn(
-    scale_parameters,
-    dim,
-    depth,
-    data,
-    labels,
-    CV=None,
-    reg_est=[10, 100],
-    reg_feat=["auto"],
-    cpu_number_one=1,
-    cpu_number_two=1,
-):
+    scale_factors: list[float],
+    dim: int,
+    depth: int,
+    data: list[np.array],
+    labels: list[int],
+    CV: Any = None,
+    reg_est: list[int] = [10, 100],
+    reg_feat: list[str | int | float] = ["auto"],
+    cpu_number_one: int = 1,
+    cpu_number_two: int = 1,
+) -> tuple[list[tuple[float, RFC, float]], tuple[float, RFC, float]]:
     """
-    scale_parameters is a list of floats, dim and depth are positive integers,
-    data is a list of numpy arrays with each array having the shape of an esig
-    stream2sig output for a stream of dimension dim truncated to level depth,
-    labels is a list, same length as data list, of integers, CV determines the
-    cross-validation splitting strategy of a sklearn GridSearchCV and can be any
-    of the allowed options for this (deault is None), reg_est is a list of
-    possible n_estimators inputs for a RandomForestClassifier model (default is
-    [10,100]), reg_feat is is a list of max_features strategies for a
-    RandomForestClassifier model (default is ['auto']), and cpu_number_one and
-    cpu_number_two are integers controlling the number of cpus used for
-    parallelisation (default values are 1).
+    Fit a RandomForestClassifier model to the input data, using the given scale factors.
 
     The returned outputs are a list of the results of forest_learn(r, dim,
     depth, data, labels, CV, reg_est, reg_feat) for each entry r in
-    scale_parameters, and a separate recording of the output corresponding to
-    the entry r in scale_parameters for which the best accuracy_score is
-    achieved.
+    scale_factors, and a separate recording of the output corresponding to
+    the entry r in scale_factors for which the best accuracy_score is achieved.
 
     The integer cpu_number_one determines how many cpus are used for
-    parallelisation over the scalefactors, whilst cpu_number_two determines the
+    parallelisation over the scale_factors, whilst cpu_number_two determines the
     number of cpus used for parallelisation during the call of the function
-    forest_learn for each scalefactor considered.
-    """
+    forest_learn for each scale_factor considered.
 
+    Parameters
+    ----------
+    scale_factors : list[float]
+        List of scaling factors to be applied to the signature terms
+    dim : int
+        Dimension of the input stream
+    depth : int
+        Level to which the input signature is truncated
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+        containing the signature of the stream
+    labels : list[int]
+        List of integer labels marking the number corresponding to each sequence
+    CV : Any, optional
+        Must be an int, cross-validation generator or an iterable.
+        See scikit-learn documentation for more details, by default None
+    reg_est : list[int], optional
+        List of possible n_estimators inputs for a RandomForestClassifier model,
+        by default [10,100]
+    reg_feat : list[str  |  int  |  float], optional
+        List of max_features strategies for a RandomForestClassifier model,
+        by default ["auto"]
+    cpu_number_one : int, optional
+        The number of cpus to use for parallelisation over the scale_factors,
+        by default 1
+    cpu_number_two : int, optional
+        The number of cpus to use for parallelisation during the call of the
+        function ridge_learn for each scale_factor considered, by default 1
+
+    Returns
+    -------
+    tuple[list[tuple[float, RFC, float]], tuple[float, RFC, float]]
+        A tuple containing a list of the results of forest_learn(r, dim, depth,
+        data, labels, CV, reg_est, reg_feat) for each entry r in scale_factors,
+        and a separate recording of the output corresponding to the entry r in
+        scale_factors for which the best accuracy_score is achieved
+    """
     if depth == 0:
         return print(
             "Error: Depth 0 term of signature is always 1 and will not change under scaling"
@@ -793,20 +975,28 @@ def forest_scale_learn(
                     reg_feat,
                     cpu_number=cpu_number_two,
                 )
-                for r in scale_parameters
+                for r in scale_factors
             ]
         )
         best = np.argmax(np.delete(results, 1, axis=1), axis=0)[1]
         return results, results[best]
 
 
-def inv_reset_like_sum(stream):
+def inv_reset_like_sum(stream: np.array) -> np.array:
     """
-    The input stream is a numpy array. The returned output is a numpy array of
-    the same shape, but where the n^th entry in the output is given by the
-    component-wise sum of the first n entries in stream.
-    """
+    Apply the inverse of the reset_like_sum function to the input stream.
 
+    Parameters
+    ----------
+    stream : np.array
+        Stream of data
+
+    Returns
+    -------
+    np.array
+        Stream of data with the n^th entry in the output given by the
+        component-wise sum of the first n entries in stream
+    """
     if isinstance(stream, np.ndarray) == True:
         A = np.zeros(stream.shape, dtype=float)
         for k in range(len(A)):
@@ -816,15 +1006,22 @@ def inv_reset_like_sum(stream):
         return print("Error: Input is not a numpy array")
 
 
-def kmeans_fit(a, data):
+def kmeans_fit(a: int, data: list[np.array]) -> KMeans:
     """
-    a is an integer in [2, len(data) - 1] and data is a list of float-valued
-    numpy arrays.
+    Fit a KMeans cluster model to the input data, using a clusters number of a.
 
-    The returned output is a KMeans cluster model, with n_clusters = a, fitted
-    to data.
+    Parameters
+    ----------
+    a : int
+        Integer in [2, len(data) - 1]
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+
+    Returns
+    -------
+    KMeans
+        KMeans cluster model, with n_clusters = a, fitted to data
     """
-
     if a < 2 or a >= len(data):
         return print(
             "Error: Number of clusters must be an integer in [{},{}]".format(
@@ -835,12 +1032,10 @@ def kmeans_fit(a, data):
         return KMeans(n_clusters=a, random_state=42).fit(data)
 
 
-def kmeans_cluster_number(k_range, data, cpu_number=1):
+def kmeans_cluster_number(
+    k_range: set[int], data: list[np.array], cpu_number: int = 1
+) -> tuple[int, float]:
     """
-    k_range is a set of integers in [2, len(data) - 1], data is a list of
-    float-valued numpy arrays and cpu_number is an integer controlling the
-    number of cpus used for parallelisation (its default value is 1).
-
     For each integer j in k_range, a KMeans cluster model looking for j clusters
     is fitted to data.
 
@@ -848,8 +1043,22 @@ def kmeans_cluster_number(k_range, data, cpu_number=1):
 
     The returned output is the model achieving the highest silhouette_score and
     its associated silhouette_score.
-    """
 
+    Parameters
+    ----------
+    k_range : set[int]
+        Set of integers in [2, len(data) - 1]
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+    cpu_number : int, optional
+        The number of cpus to use for parallelisation, by default 1
+
+    Returns
+    -------
+    tuple[int, float]
+        The model achieving the highest silhouette_score and its associated
+        silhouette_score
+    """
     if min(k_range) < 2 or max(k_range) >= len(data):
         return print(
             "Error: k_range must be a set of integers within [{},{}]".format(
@@ -869,12 +1078,10 @@ def kmeans_cluster_number(k_range, data, cpu_number=1):
         return best_k, best_score
 
 
-def kmeans_percentile_propagate(cluster_num, percent, data, labels):
+def kmeans_percentile_propagate(
+    cluster_num: int, percent: float, data: list[np.array], labels: list[int]
+) -> tuple[list[np.array], list[int]]:
     """
-    cluster_num is an integer in [2, len(data)-1], percent is a float in
-    [0,100], data is a list of float-valued numpy arrays and labels is a list,
-    of same length as data, of integers.
-
     A KMeans model with cluster_num clusters is used to fit_transform data.
 
     A representative centroid element from each cluster is assigned its
@@ -885,8 +1092,24 @@ def kmeans_percentile_propagate(cluster_num, percent, data, labels):
 
     The returned output is a list of these chosen instances and a list of the
     corresponding labels for these instances.
-    """
 
+    Parameters
+    ----------
+    cluster_num : int
+        Integer in [2, len(data) - 1]
+    percent : float
+        Float in [0, 100]
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+    labels : list[int]
+        List of integer labels marking the number corresponding to each sequence
+
+    Returns
+    -------
+    tuple[list[np.array], list[int]]
+        A tuple containing a list of the chosen instances and a list of the
+        corresponding labels for these instances
+    """
     if percent > 100 or percent < 0:
         return print("Error: percent must be in [{},{}]".format(0, 100))
     if cluster_num > len(data) - 1 or cluster_num < 2:
@@ -912,29 +1135,54 @@ def kmeans_percentile_propagate(cluster_num, percent, data, labels):
         return data_pp, labels_pp
 
 
-def model_performance(B, dim, depth, data, labels, cpu_number):
+def model_performance(
+    B: tuple[float, Any],
+    dim: int,
+    depth: int,
+    data: list[np.array],
+    labels: list[int],
+    cpu_number: int,
+) -> tuple[float, Any, float, np.array, np.array]:
     """
-    B is a list with B[0] being a float and B[1] a trained classifier that is
-    already fitted to (data, labels), dim and depth are positive integers, data
-    is a list of float-valued numpy arrays, with each array having the shape of
-    an esig stream2sig output for a stream of dimension dim truncated to level
-    depth, labels is a list (same length as data) of integers, and cpu_number is
-    an integer controlling the number of cpus used for parallelisation.
+    Compute model performance using the given model B and the input data.
+    Compute the accuracy_score, the confusion matrix and a normalised confusion_matrix.
 
     The entries in the data list are scaled via the sig_scale_depth_ratio
-    function with B[0] as the scalefactor, i.e.  sig_scale_depth_ratio(data,
-    dim, depth, scalefactor = B[0]).
+    function with B[0] as the scale_factor, i.e. sig_scale_depth_ratio(data,
+    dim, depth, scale_factor = B[0]).
 
     The model B[1] is used to make predictions using the rescaled data, and the
     accuracy_score, the confusion matrix and a normalised confusion_matrix
     (focusing only on the incorrect classifications) of these predictions
     compared to the labels are computed.
 
-    The returned outputs are the scalefactor B[0] used, the model B[1] used, the
+    The returned outputs are the scale_factor B[0] used, the model B[1] used, the
     accuracy_score achieved, the confusion_matrix and the normalised
     confusion_matrix highlighting the errors.
-    """
 
+    Parameters
+    ----------
+    B : tuple[float, Any]
+        A tuple containing a float and a trained classifier
+    dim : int
+        Dimension of the input stream
+    depth : int
+        Level to which the input signature is truncated
+    data : list[np.array]
+        List of numpy arrays of shape [signature_terms]
+        containing the signature of the stream
+    labels : list[int]
+        List of integer labels marking the number corresponding to each sequence
+    cpu_number : int
+        The number of cpus to use for parallelisation
+
+    Returns
+    -------
+    tuple[float, Any, float, np.array, np.array]
+        A tuple containing the scale_factor used, the model selected during the
+        GridSearch, the accuracy_score achieved by the selected model, the
+        confusion_matrix and the normalised confusion_matrix highlighting the errors
+    """
     scaled_data = Parallel(n_jobs=cpu_number)(
         [delayed(sig_scale_depth_ratio)(a, dim, depth, B[0]) for a in data]
     )
