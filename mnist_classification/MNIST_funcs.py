@@ -1,5 +1,5 @@
 import statistics
-from typing import Any
+from typing import Any, Callable
 
 import joblib
 import numpy as np
@@ -175,14 +175,14 @@ def mnist_train_data(
 
     def func_A(data_directory: str, k: int) -> np.array:
         return np.loadtxt(
-            "./{}/sequences/trainimg-{}-points.txt".format(data_directory, k),
+            f"./{data_directory}/sequences/trainimg-{k}-points.txt",
             delimiter=",",
             skiprows=1,
         )[:-1, :]
 
     def func_B(data_directory: str, k: int) -> np.array:
         return np.loadtxt(
-            "./{}/sequences/trainimg-{}-inputdata.txt".format(data_directory, k),
+            f"./{data_directory}/sequences/trainimg-{k}-inputdata.txt",
             delimiter=" ",
             usecols=np.arange(0, 3),
         )[:-1, :]
@@ -191,9 +191,7 @@ def mnist_train_data(
         return statistics.mode(
             np.argmax(
                 np.loadtxt(
-                    "./{}/sequences/trainimg-{}-targetdata.txt".format(
-                        data_directory, k
-                    ),
+                    f"./{data_directory}/sequences/trainimg-{k}-targetdata.txt",
                     delimiter=" ",
                 ),
                 axis=1,
@@ -241,14 +239,14 @@ def mnist_test_data(
 
     def func_A(data_directory: str, k: int) -> np.array:
         return np.loadtxt(
-            "./{}/sequences/testimg-{}-points.txt".format(data_directory, k),
+            f"./{data_directory}/sequences/testimg-{k}-points.txt",
             delimiter=",",
             skiprows=1,
         )[:-1, :]
 
     def func_B(data_directory: str, k: int) -> np.array:
         return np.loadtxt(
-            "./{}/sequences/testimg-{}-inputdata.txt".format(data_directory, k),
+            f"./{data_directory}/sequences/testimg-{k}-inputdata.txt",
             delimiter=" ",
             usecols=np.arange(0, 3),
         )[:-1, :]
@@ -257,9 +255,7 @@ def mnist_test_data(
         return statistics.mode(
             np.argmax(
                 np.loadtxt(
-                    "./{}/sequences/testimg-{}-targetdata.txt".format(
-                        data_directory, k
-                    ),
+                    f"./{data_directory}/sequences/testimg-{k}-targetdata.txt",
                     delimiter=" ",
                 ),
                 axis=1,
@@ -453,7 +449,7 @@ def SVC_learn(
     CV: Any = None,
     regC: list[float] = [1.0],
     reg_gamma: list[str | float] = ["scale"],
-    reg_kernel: list[str | callable] = ["rbf"],
+    reg_kernel: list[str | Callable] = ["rbf"],
     cpu_number: int = 1,
 ) -> tuple[float, SVC, float]:
     """
@@ -493,7 +489,7 @@ def SVC_learn(
         List of possible C inputs for a SVC model, by default [1.0]
     reg_gamma : list[str  |  float], optional
         List of possible gamma value strategies for a SVC model, by default ["scale"]
-    reg_kernel : list[str  |  callable], optional
+    reg_kernel : list[str  |  Callable], optional
         List of possible kernels to be used in a SVC model, by default ["rbf"]
     cpu_number : int, optional
         The number of cpus to use for parallelisation, by default 1
@@ -538,7 +534,7 @@ def SVC_scale_learn(
     CV: Any = None,
     regC: list[float] = [1.0],
     reg_gamma: list[str | float] = ["scale"],
-    reg_kernel: list[str | callable] = ["rbf"],
+    reg_kernel: list[str | Callable] = ["rbf"],
     cpu_number_one: int = 1,
     cpu_number_two: int = 1,
 ) -> tuple[list[tuple[float, SVC, float]], tuple[float, SVC, float]]:
@@ -575,7 +571,7 @@ def SVC_scale_learn(
         List of possible C inputs for a SVC model, by default [1.0]
     reg_gamma : list[str  |  float], optional
         List of possible gamma value strategies for a SVC model, by default ["scale"]
-    reg_kernel : list[str  |  callable], optional
+    reg_kernel : list[str  |  Callable], optional
         List of possible kernels to be used in a SVC model, by default ["rbf"]
     cpu_number_one : int, optional
         The number of cpus to use for parallelisation over the scale_factors,
@@ -1024,9 +1020,7 @@ def kmeans_fit(a: int, data: list[np.array]) -> KMeans:
     """
     if a < 2 or a >= len(data):
         return print(
-            "Error: Number of clusters must be an integer in [{},{}]".format(
-                2, len(data) - 1
-            )
+            f"Error: Number of clusters must be an integer in [{2},{len(data) - 1}]"
         )
     else:
         return KMeans(n_clusters=a, random_state=42).fit(data)
@@ -1042,7 +1036,7 @@ def kmeans_cluster_number(
     The silhouette_score of each trained model is computed.
 
     The returned output is the model achieving the highest silhouette_score and
-    its associated silhouette_score.
+    its associated silhouette_score
 
     Parameters
     ----------
@@ -1061,9 +1055,7 @@ def kmeans_cluster_number(
     """
     if min(k_range) < 2 or max(k_range) >= len(data):
         return print(
-            "Error: k_range must be a set of integers within [{},{}]".format(
-                2, len(data) - 1
-            )
+            f"Error: k_range must be a set of integers within [{2},{len(data) - 1}]"
         )
     else:
         kmeans_per_k = Parallel(n_jobs=cpu_number)(
@@ -1111,11 +1103,9 @@ def kmeans_percentile_propagate(
         corresponding labels for these instances
     """
     if percent > 100 or percent < 0:
-        return print("Error: percent must be in [{},{}]".format(0, 100))
+        return print("Error: percent must be in [0,100]")
     if cluster_num > len(data) - 1 or cluster_num < 2:
-        return print(
-            "Error: cluster_num must be an integer in [{},{}]".format(2, len(data) - 1)
-        )
+        return print(f"Error: cluster_num must be an integer in [{2},{len(data) - 1}]")
     else:
         kmeans = KMeans(n_clusters=cluster_num, random_state=42)
         data_dist = kmeans.fit_transform(data)
