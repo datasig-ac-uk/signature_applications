@@ -1129,7 +1129,7 @@ def kmeans_cluster_number(
             [delayed(kmeans_fit)(a=a, data=data) for a in k_range]
         )
         silhouette_scores = [
-            silhouette_score(data, model.labels_) for model in kmeans_per_k
+            silhouette_score(X=data, labels=model.labels_) for model in kmeans_per_k
         ]
         best_index = np.argmax(silhouette_scores)
         best_k = k_range[best_index]
