@@ -92,6 +92,58 @@ def compute_signature(stream: np.array, depth: int) -> np.array:
     return np.array(lie_incremement_stream.signature())
 
 
+def compute_signatures_with_normalisation(
+    train_points: list[np.array],
+    test_points: list[np.array],
+    depth: int,
+    normalisation: callable,
+    n_jobs: int,
+) -> tuple[list[np.array], list[np.array]]:
+    """
+    Compute the signatures of the input streams, truncated to the given depth,
+    using the given normalisation function and parallelising the computation
+    over the given number of cpus.
+
+    Parameters
+    ----------
+    train_points : list[np.array]
+        A list of numpy arrays, each of shape [length x dimension]
+    test_points : list[np.array]
+        A list of numpy arrays, each of shape [length x dimension]
+    depth : int
+        The depth to which the signature should be truncated
+    normalisation : callable
+        A function to normalise the input streams. Applied to each stream
+        in train_points and test_points before computing the signature
+    n_jobs : int
+        The number of cpus to use for parallelisation
+
+    Returns
+    -------
+    tuple[list[np.array], list[np.array]]
+        A tuple containing the computed signatures of the train and test
+        points, respectively
+    """
+    train_sigs = Parallel(n_jobs=n_jobs)(
+        [
+            delayed(compute_signature)(
+                stream=normalisation(train_points[k]), depth=depth
+            )
+            for k in range(len(train_points))
+        ]
+    )
+    test_sigs = Parallel(n_jobs=n_jobs)(
+        [
+            delayed(compute_signature)(
+                stream=normalisation(test_points[k]), depth=depth
+            )
+            for k in range(len(test_points))
+        ]
+    )
+
+    return train_sigs, test_sigs
+
+
 def sig_scale_depth_ratio(
     sig: np.array,
     dim: int,
@@ -199,13 +251,13 @@ def mnist_train_data(
         )
 
     A = Parallel(n_jobs=cpu_number)(
-        [delayed(func_A)(data_directory, j) for j in range(60000)]
+        [delayed(func_A)(data_directory, k=j) for j in range(60000)]
     )
     B = Parallel(n_jobs=cpu_number)(
-        [delayed(func_B)(data_directory, j) for j in range(60000)]
+        [delayed(func_B)(data_directory, k=j) for j in range(60000)]
     )
     C = Parallel(n_jobs=cpu_number)(
-        [delayed(func_C)(data_directory, j) for j in range(60000)]
+        [delayed(func_C)(data_directory, k=j) for j in range(60000)]
     )
 
     return A, B, C
@@ -263,13 +315,13 @@ def mnist_test_data(
         )
 
     A = Parallel(n_jobs=cpu_number)(
-        [delayed(func_A)(data_directory, j) for j in range(10000)]
+        [delayed(func_A)(data_directory, k=j) for j in range(10000)]
     )
     B = Parallel(n_jobs=cpu_number)(
-        [delayed(func_B)(data_directory, j) for j in range(10000)]
+        [delayed(func_B)(data_directory, k=j) for j in range(10000)]
     )
     C = Parallel(n_jobs=cpu_number)(
-        [delayed(func_C)(data_directory, j) for j in range(10000)]
+        [delayed(func_C)(data_directory, k=j) for j in range(10000)]
     )
 
     return A, B, C
@@ -344,7 +396,9 @@ def ridge_learn(
         tuned_params = {"alphas": reg}
         Q = Parallel(n_jobs=cpu_number)(
             [
-                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_factor)
+                delayed(sig_scale_depth_ratio)(
+                    sig=data[k], dim=dim, depth=depth, scale_factor=scale_factor
+                )
                 for k in range(len(data))
             ]
         )
@@ -431,7 +485,14 @@ def ridge_scale_learn(
         results = Parallel(n_jobs=cpu_number_one)(
             [
                 delayed(ridge_learn)(
-                    r, dim, depth, data, labels, CV, reg, cpu_number=cpu_number_two
+                    scale_factor=r,
+                    dim=dim,
+                    depth=depth,
+                    data=data,
+                    labels=labels,
+                    CV=CV,
+                    reg=reg,
+                    cpu_number=cpu_number_two,
                 )
                 for r in scale_factors
             ]
@@ -511,7 +572,9 @@ def SVC_learn(
         tuned_params = {"kernel": reg_kernel, "C": regC, "gamma": reg_gamma}
         Q = Parallel(n_jobs=cpu_number)(
             [
-                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_factor)
+                delayed(sig_scale_depth_ratio)(
+                    sig=data[k], dim=dim, depth=depth, scale_factor=scale_factor
+                )
                 for k in range(len(data))
             ]
         )
@@ -602,15 +665,15 @@ def SVC_scale_learn(
         results = Parallel(n_jobs=cpu_number_one)(
             [
                 delayed(SVC_learn)(
-                    r,
-                    dim,
-                    depth,
-                    data,
-                    labels,
-                    CV,
-                    regC,
-                    reg_gamma,
-                    reg_kernel,
+                    scale_factor=r,
+                    dim=dim,
+                    depth=depth,
+                    data=data,
+                    labels=labels,
+                    CV=CV,
+                    regC=regC,
+                    reg_gamma=reg_gamma,
+                    reg_kernel=reg_kernel,
                     cpu_number=cpu_number_two,
                 )
                 for r in scale_factors
@@ -690,7 +753,9 @@ def logistic_learn(
         tuned_params = {"Cs": regC, "max_iter": no_iter}
         Q = Parallel(n_jobs=cpu_number)(
             [
-                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_factor)
+                delayed(sig_scale_depth_ratio)(
+                    sig=data[k], dim=dim, depth=depth, scale_factor=scale_factor
+                )
                 for k in range(len(data))
             ]
         )
@@ -781,14 +846,14 @@ def logistic_scale_learn(
         results = Parallel(n_jobs=cpu_number_one)(
             [
                 delayed(logistic_learn)(
-                    r,
-                    dim,
-                    depth,
-                    data,
-                    labels,
-                    CV,
-                    regC,
-                    no_iter,
+                    scale_factor=r,
+                    dim=dim,
+                    depth=depth,
+                    data=data,
+                    labels=labels,
+                    CV=CV,
+                    regC=regC,
+                    no_iter=no_iter,
                     cpu_number=cpu_number_two,
                 )
                 for r in scale_factors
@@ -871,7 +936,9 @@ def forest_learn(
         tuned_params = {"n_estimators": reg_est, "max_features": reg_feat}
         Q = Parallel(n_jobs=cpu_number)(
             [
-                delayed(sig_scale_depth_ratio)(data[k], dim, depth, scale_factor)
+                delayed(sig_scale_depth_ratio)(
+                    sig=data[k], dim=dim, depth=depth, scale_factor=scale_factor
+                )
                 for k in range(len(data))
             ]
         )
@@ -961,14 +1028,14 @@ def forest_scale_learn(
         results = Parallel(n_jobs=cpu_number_one)(
             [
                 delayed(forest_learn)(
-                    r,
-                    dim,
-                    depth,
-                    data,
-                    labels,
-                    CV,
-                    reg_est,
-                    reg_feat,
+                    scale_factor=r,
+                    dim=dim,
+                    depth=depth,
+                    data=data,
+                    labels=labels,
+                    CV=CV,
+                    reg_est=reg_est,
+                    reg_feat=reg_feat,
                     cpu_number=cpu_number_two,
                 )
                 for r in scale_factors
@@ -978,9 +1045,9 @@ def forest_scale_learn(
         return results, results[best]
 
 
-def inv_reset_like_sum(stream: np.array) -> np.array:
+def invisibility_reset_like_sum(stream: np.array) -> np.array:
     """
-    Apply the inverse of the reset_like_sum function to the input stream.
+    Apply the invisibility reset-like sum transformation to the input stream.
 
     Parameters
     ----------
@@ -1059,7 +1126,7 @@ def kmeans_cluster_number(
         )
     else:
         kmeans_per_k = Parallel(n_jobs=cpu_number)(
-            [delayed(kmeans_fit)(a, data) for a in k_range]
+            [delayed(kmeans_fit)(a=a, data=data) for a in k_range]
         )
         silhouette_scores = [
             silhouette_score(data, model.labels_) for model in kmeans_per_k
@@ -1107,7 +1174,7 @@ def kmeans_percentile_propagate(
     if cluster_num > len(data) - 1 or cluster_num < 2:
         return print(f"Error: cluster_num must be an integer in [{2},{len(data) - 1}]")
     else:
-        kmeans = KMeans(n_clusters=cluster_num, random_state=42)
+        kmeans = KMeans(n_clusters=cluster_num, n_init=10, random_state=42)
         data_dist = kmeans.fit_transform(data)
         data_cluster_dist = data_dist[np.arange(len(data)), kmeans.labels_]
         for i in range(cluster_num):
@@ -1174,7 +1241,12 @@ def model_performance(
         confusion_matrix and the normalised confusion_matrix highlighting the errors
     """
     scaled_data = Parallel(n_jobs=cpu_number)(
-        [delayed(sig_scale_depth_ratio)(a, dim, depth, B[0]) for a in data]
+        [
+            delayed(sig_scale_depth_ratio)(
+                sig=a, dim=dim, depth=depth, scale_factor=B[0]
+            )
+            for a in data
+        ]
     )
     preds = B[1].predict(scaled_data)
     acc = accuracy_score(preds, labels)
