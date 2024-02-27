@@ -1,4 +1,4 @@
-# Path Signatures for Handwritten Digit Classification using Esig
+# Path Signatures for Controlled Neural Differential Equations
 [logsignature.ipynb](logsignature.ipynb) and [time_series_classification.ipynb](time_series_classification.ipynb) are [Jupyter](https://jupyter.org/) notebooks which demonstrate the use of controlled neural differential equations. The notebook is viewable directly from gitlab, however Jupyter is recommendedfor best results when rendering mathematical notation.
 
 ## How to Run
