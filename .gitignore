@@ -128,9 +128,11 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-.DS_Store
-
 # miscellaneous
 anomaly_detection_language_dataset/english-char-roberta/
 anomaly_detection_language_dataset/char-roberta/
 anomaly_detection_language_dataset/*.pkl
+
+# miscellaneous
+*.DS_Store
+*.vscode
