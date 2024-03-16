@@ -129,5 +129,10 @@ dmypy.json
 .pyre/
 
 # miscellaneous
+anomaly_detection_language_dataset/english-char-roberta/
+anomaly_detection_language_dataset/char-roberta/
+anomaly_detection_language_dataset/*.pkl
+
+# miscellaneous
 *.DS_Store
 *.vscode
