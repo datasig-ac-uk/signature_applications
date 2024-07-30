@@ -1,6 +1,6 @@
 signature_mahalanobis_knn==0.1.0
 nlpsig==0.2.2
-signax==0.2.1
+roughpy==0.1.1
 jupyter
 ipywidgets==8.1.1
 tqdm==4.66.1
@@ -13,3 +13,4 @@ scikit-learn==1.3.1
 pandas==2.1.1
 numpy==1.25.2
 matplotlib==3.8.0
+joblib==1.3.2
