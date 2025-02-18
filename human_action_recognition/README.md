@@ -12,3 +12,7 @@ Then install PyTorch manually following the [official instructions](https://pyto
 Alternatively (not recommended) you can run
 
     pip install -r requirements_torch.txt
+
+The above needs updating, rough notes:
+ - Uses pyproject.toml, need to update psfdataset requirement
+ - Users need to also install ffmpeg
