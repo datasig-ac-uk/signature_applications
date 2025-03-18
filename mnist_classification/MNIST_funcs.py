@@ -29,7 +29,8 @@ def stream_normalise_mean_and_range(stream: np.array) -> np.array:
         to have mean 0 and coordinates/channels in [-1,1]
     """
     # compute the range of each channel
-    range = stream.ptp(axis=0)
+    # range = stream.ptp(axis=0)
+    range = np.ptp(stream, axis=0)
     # replace 0s with 1s to avoid division by 0
     range[range == 0] = 1
     # scale the stream
