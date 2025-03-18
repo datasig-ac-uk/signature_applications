@@ -1,0 +1,27 @@
+[project]
+name = "mnist-classification"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "jupyterlab (>=4.3.6,<5.0.0)",
+    "numpy (>=2.2.4,<3.0.0)",
+    "matplotlib (>=3.10.1,<4.0.0)",
+    "scipy (>=1.15.2,<2.0.0)",
+    "joblib (>=1.4.2,<2.0.0)",
+    "scikit-learn (>=1.6.1,<2.0.0)",
+    "ipywidgets (>=8.1.5,<9.0.0)",
+    "roughpy (>=0.2.0,<0.3.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
