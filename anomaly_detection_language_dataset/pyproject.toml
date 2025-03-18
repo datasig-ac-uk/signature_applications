@@ -1,0 +1,32 @@
+[project]
+name = "anomaly-detection-language-dataset"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10, <3.12"
+dependencies = [
+    "roughpy (>=0.2.0,<0.3.0)",
+    "jupyter (>=1.1.1,<2.0.0)",
+    "ipywidgets (>=8.1.5,<9.0.0)",
+    "tqdm (>=4.67.1,<5.0.0)",
+    "torch (>=2.6.0,<3.0.0)",
+    "tokenizers (>=0.21.1,<0.22.0)",
+    "transformers (>=4.49.0,<5.0.0)",
+    "accelerate (>=1.5.2,<2.0.0)",
+    "scikit-learn (>=1.6.1,<2.0.0)",
+    "pandas (>=2.2.3,<3.0.0)",
+    "numpy (>=2.2.4,<3.0.0)",
+    "matplotlib (>=3.10.1,<4.0.0)",
+    "joblib (>=1.4.2,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
