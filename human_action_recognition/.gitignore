@@ -1,0 +1,6 @@
+*.avi
+*.mp4
+.venv*
+*.json
+*.npz
+datasets
