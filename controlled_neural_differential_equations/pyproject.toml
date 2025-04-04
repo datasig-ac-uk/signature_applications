@@ -1,0 +1,23 @@
+[project]
+name = "controlled-neural-differential-equations"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "matplotlib (>=3.10.0,<4.0.0)",
+    "torch (>=2.5.1,<3.0.0)",
+    "torchcde @ git+ssh://git@github.com/patrick-kidger/torchcde.git",
+    "signatory @ git+ssh://git@github.com/datasig-ac-uk/signatory.git"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
