@@ -13,3 +13,19 @@ in Cardiology (CinC) (2019).
 > Morrill, J., Kormilitzin, A., Nevado-Holgado, A., Swaminathan, S., Howison, S., Lyons, T.: Utilization
 of the signature method to identify the early onset of sepsis from multivariate physiological time series in
 critical care monitoring. Critical Care Medicine 48(10), 976--981 (2020).
+
+
+## Getting started
+
+First install Poetry according to instructions at: https://python-poetry.org/docs/
+
+
+```bash
+poetry install
+
+jupyter notebook sepsis_detection.ipynb
+```
+
+## Dependencies
+
+This notebook's dependencies are listed in the [pyproject.toml](pyproject.toml) file.
