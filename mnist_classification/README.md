@@ -9,7 +9,8 @@ First install Poetry according to instructions at: https://python-poetry.org/doc
 ```bash
 poetry install
 
-jupyter notebook drone_identification.ipynb
+jupyter lab
+
 ```
 
 ## Dependencies
