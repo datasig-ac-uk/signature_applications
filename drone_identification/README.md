@@ -13,6 +13,10 @@ poetry install
 jupyter notebook drone_identification.ipynb
 ```
 
+## Dependencies
+
+This notebook's dependencies are listed in the [pyproject.toml](pyproject.toml) file.
+
 ## Running the notebook
 
 Please note that the notebook involves some heavy computation.
@@ -20,7 +24,3 @@ For ease of use, the notebook caches results inside the directory [cached_signat
 This directory has been pre-populated. If you would like to ensure that results are recomputed, simply delete the cached_signatures directory and re-run the notebook.
 As is suggested in the notebook, users with access to limited computational resources might consider reducing the value of N_INCIDENT_SIGNALS from 3000 to 300, for exploratory purposes.
 Users with SSH access to abundant computational resources might consider running Jupyter remotely, [via a tunnel](https://docs.anaconda.com/anaconda/user-guide/tasks/remote-jupyter-notebook/) if necessary.
-
-## Dependencies
-
-This notebook's dependencies are listed in [pyproject.toml](pyproject.toml).
