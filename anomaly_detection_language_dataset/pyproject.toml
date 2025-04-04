@@ -18,9 +18,13 @@ dependencies = [
     "accelerate (>=1.5.2,<2.0.0)",
     "scikit-learn (>=1.6.1,<2.0.0)",
     "pandas (>=2.2.3,<3.0.0)",
-    "numpy (>=2.2.4,<3.0.0)",
+    "numpy (>=2.1,<3.0.0)",
     "matplotlib (>=3.10.1,<4.0.0)",
-    "joblib (>=1.4.2,<2.0.0)"
+    "joblib (>=1.4.2,<2.0.0)",
+    "numba (>=0.61.0,<0.62.0)",
+    "signature-mahalanobis-knn (>=0.1.0,<0.2.0)",
+    "nlpsig (>=0.2.2,<0.3.0)",
+    "umap-learn (>=0.5.7,<0.6.0)"
 ]
 
 
