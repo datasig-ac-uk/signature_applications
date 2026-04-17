@@ -13,3 +13,11 @@ in Cardiology (CinC) (2019).
 > Morrill, J., Kormilitzin, A., Nevado-Holgado, A., Swaminathan, S., Howison, S., Lyons, T.: Utilization
 of the signature method to identify the early onset of sepsis from multivariate physiological time series in
 critical care monitoring. Critical Care Medicine 48(10), 976--981 (2020).
+
+### Warning
+
+This notebooks in this repository are for demonstration purposes only. The code here might not be suitable for
+deployment. Some of the dependencies are out of date and contain known security vulnerabilities. We strongly recommend
+that you review the code and dependencies for each notebook to ensure they are consistent with your organization's
+security policies, current best-practices, and any compliance requirements before using them for any production
+deployments.

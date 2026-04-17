@@ -3,3 +3,11 @@
 
 ## How to Run
 The notebook attempts to install the packages listed in [requirements.txt](requirements.txt) automatically when executed. A typical process involves first creating a new Python virtual environment and then inside the environment executing the notebook.
+
+### Warning
+
+This notebooks in this repository are for demonstration purposes only. The code here might not be suitable for
+deployment. Some of the dependencies are out of date and contain known security vulnerabilities. We strongly recommend
+that you review the code and dependencies for each notebook to ensure they are consistent with your organization's
+security policies, current best-practices, and any compliance requirements before using them for any production
+deployments.
